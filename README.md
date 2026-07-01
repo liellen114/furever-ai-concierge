@@ -183,7 +183,8 @@ This project uses a beginner-friendly stack:
 - agents-cli / agent runtime for deployment if feasible
 - Cloud Trace or local trace logs for observability evidence
 
-See `PROMPTS.md` and `GEMINI_INTEGRATION.md` for the agent prompt design and future Gemini API integration plan.
+See `PROMPTS.md`, `GEMINI_INTEGRATION.md`, and `DEPLOYMENT.md` for the agent prompt design, future Gemini API integration plan, and deployment/fallback strategy.
+
 ## Why This Stack
 
 The project focuses on demonstrating agent design rather than building a complex production system. Streamlit and local JSON storage allow the prototype to stay simple, while the multi-agent workflow demonstrates the core course concepts.
