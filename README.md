@@ -248,6 +248,27 @@ To keep the capstone realistic within 18 hours, this project will not include:
 - Complex photo album management
 - Veterinary diagnosis or medical advice
 
+## Evidence and Screenshots
+
+The `screenshots/` folder is used to store capstone evidence screenshots.
+
+Recommended screenshots include:
+
+- app overview
+- required written memory and date fields
+- optional photo/video upload as supporting media
+- photo date metadata suggestion when available
+- approved timeline
+- human-in-the-loop review queue
+- Story Agent output
+- Safety Agent sitter-safe share card
+- observability trace log
+- demo controls
+
+The observability screenshot demonstrates local trace logging for agent workflow steps and routing decisions.
+
+The media upload screenshot demonstrates that FurEver treats photos and videos as supporting memory evidence, not as a secondary photo album.
+
 ## Setup Instructions
 
 Clone the repository:
