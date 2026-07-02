@@ -182,6 +182,9 @@ This project uses a beginner-friendly stack:
 - Google AI Studio for prompt testing
 - agents-cli / agent runtime for deployment if feasible
 - Cloud Trace or local trace logs for observability evidence
+- Optional photo/video uploads as supporting memory media
+- Photo EXIF date extraction when metadata is available
+- Manual date and location input for user confirmation
 
 See `PROMPTS.md`, `GEMINI_INTEGRATION.md`, and `DEPLOYMENT.md` for the agent prompt design, future Gemini API integration plan, and deployment/fallback strategy.
 
@@ -201,6 +204,25 @@ The minimum working demo will show one complete agent workflow:
 6. The user can approve or reject memories in the review queue.
 7. The Story Agent generates a life story using only approved timeline memories.
 8. The Safety Agent generates a sitter-safe share card with sensitive details removed.
+
+## Media Memory Support
+
+FurEver supports text-based memories with optional photo or video attachments.
+
+The app is designed to encourage pet owners to organize meaningful memories, not simply use the app as a secondary photo album. For this reason, every memory requires:
+
+- a written pet memory
+- a date source
+
+The date source can come from:
+
+- a manually selected calendar date
+- an approximate period entered by the user
+- photo date metadata, if available from the uploaded image
+
+Uploaded media is treated as supporting evidence for the written memory.
+
+The current prototype extracts photo date metadata when available, but does not extract GPS/location metadata. GPS extraction is planned as a future improvement because it requires additional privacy controls and user confirmation.
 
 ## Demo Success Criteria
 

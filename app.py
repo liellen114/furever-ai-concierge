@@ -8,7 +8,9 @@ from storage import (
     approve_review_item,
     reject_review_item,
     reset_demo_data,
-    load_demo_data
+    load_demo_data,
+    save_uploaded_media,
+    extract_photo_date
 )
 from trace_logger import load_traces, clear_traces, log_trace
 
@@ -19,24 +21,73 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🐾 FurEver AI Concierge")
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #fffaf3;
+    }
 
-st.subheader(
-    "A privacy-aware multi-agent assistant that turns pet memories into timelines, stories, and sitter-safe care summaries."
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1100px;
+    }
+
+    div[data-testid="stMetricValue"] {
+        font-size: 1.4rem;
+    }
+
+    .furever-hero {
+        background: linear-gradient(135deg, #fff2d8 0%, #f7e8ff 100%);
+        padding: 1.5rem;
+        border-radius: 22px;
+        border: 1px solid #ead7c3;
+        margin-bottom: 1.2rem;
+    }
+
+    .furever-card {
+        background-color: white;
+        padding: 1rem 1.2rem;
+        border-radius: 18px;
+        border: 1px solid #ead7c3;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 10px rgba(80, 60, 40, 0.05);
+    }
+
+    .small-muted {
+        color: #6f6259;
+        font-size: 0.92rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 st.markdown(
     """
-    **Course concepts demonstrated in this prototype:**
+    <div class="furever-hero">
+        <h1>🐾 FurEver AI Concierge</h1>
+        <h3>A privacy-aware multi-agent assistant for pet memories, life stories, and sitter-safe care sharing.</h3>
+        <p class="small-muted">
+        Upload a text memory, photo, or video. FurEver extracts structured memories, checks sensitivity,
+        routes uncertain content to human review, and creates approved timeline stories and sitter-safe summaries.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-    1. **Multi-agent workflow** — Memory Agent, Evaluation Agent, Story Agent, and Safety Agent work together.
-    2. **Agent skills** — memory capture, timeline building, story generation, and trust scoring.
-    3. **Human-in-the-loop** — sensitive or uncertain memories are paused for human review.
-    4. **Safety-aware sharing** — only approved and sitter-safe information is used downstream.
-    5. **Observability** — the app records trace logs showing which agent steps ran.
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Agents", "4+")
+col2.metric("Review", "Human-in-loop")
+col3.metric("Storage", "Local JSON")
+col4.metric("Evidence", "Trace logs")
 
+st.markdown(
+    """
     **Workflow:**  
-    User memory note → Memory Agent → Evaluation Agent → Decision Router → Timeline or Human Review → Story Agent / Safety Agent
+    User memory note / media → Memory Agent → Evaluation Agent → Decision Router → Timeline or Human Review → Story Agent / Safety Agent
     """
 )
 
@@ -69,23 +120,121 @@ with tab_add:
         """
         This tab demonstrates the first part of the agent workflow.
 
+        Users must write a memory and provide a date. They can optionally attach a photo or video as supporting media.
+
         - The **Memory Agent** extracts a structured memory from the note.
         - The **Evaluation Agent** checks trust score and sensitivity.
         - The **Decision Router** decides whether the memory is safe to save or needs human review.
         """
     )
 
+    st.markdown('<div class="furever-card">', unsafe_allow_html=True)
+
     note = st.text_area(
-        "Write a memory about RuRu:",
+        "Write a memory about RuRu: *",
         height=150,
         placeholder="Example: RuRu loved his first beach walk today. He was scared of the waves at first but became playful later."
     )
 
+    col_date, col_location = st.columns(2)
+
+    with col_date:
+        memory_date = st.date_input(
+            "Memory date *",
+            value=None,
+            help="Optional. Choose the exact date if you know it."
+        )
+
+        memory_period = st.text_input(
+            "Or enter an approximate period *",
+            placeholder="Example: Summer 2025, puppy stage, first week at home"
+        )
+
+    with col_location:
+        memory_location = st.text_input(
+            "Location",
+            placeholder="Example: beach, home, park, vet clinic"
+        )
+
+        uploaded_file = st.file_uploader(
+        "Optional: add a supporting photo or video",
+        type=["png", "jpg", "jpeg", "mp4", "mov"]
+    )
+    st.caption(
+        "Media is optional. FurEver requires a written memory and date so the app supports memory organization, not just photo storage."
+    )
+
+    suggested_photo_date = None
+
+    if uploaded_file is not None:
+        suggested_photo_date = extract_photo_date(uploaded_file)
+
+        st.caption("Preview of uploaded memory attachment:")
+
+        if uploaded_file.type.startswith("image"):
+            st.image(uploaded_file, use_container_width=True)
+        elif uploaded_file.type.startswith("video"):
+            st.video(uploaded_file)
+
+        if suggested_photo_date:
+            st.info(
+                f"Suggested date from photo metadata: {suggested_photo_date}. "
+                "You can still choose a different date manually."
+            )
+        elif uploaded_file.type.startswith("image"):
+            st.warning(
+                "No photo date metadata was found. Please enter the memory date manually if you know it."
+            )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if st.button("Process Memory"):
+        missing_required_fields = []
+
         if not note.strip():
-            st.warning("Please enter a memory note first.")
+            missing_required_fields.append("written pet memory")
+
+        has_manual_date = memory_date is not None
+        has_approximate_period = memory_period.strip() != ""
+        has_metadata_date = suggested_photo_date is not None
+
+        if not has_manual_date and not has_approximate_period and not has_metadata_date:
+            missing_required_fields.append("memory date")
+
+        if missing_required_fields:
+            st.warning(
+                "These mandatory fields contain missing information: "
+                + ", ".join(missing_required_fields)
+                + ". Please complete them before processing the memory."
+            )
         else:
-            result = process_memory(note)
+            media_metadata = None
+
+            if uploaded_file is not None:
+                media_metadata = save_uploaded_media(uploaded_file)
+
+            note_for_agent = note.strip()
+          
+            if memory_date is not None:
+                user_date_value = memory_date.isoformat()
+                user_date_source = "user_provided"
+            elif memory_period.strip():
+                user_date_value = memory_period.strip()
+                user_date_source = "user_provided_approximate"
+            elif suggested_photo_date:
+                user_date_value = suggested_photo_date
+                user_date_source = "media_metadata"
+            else:
+                user_date_value = None
+                user_date_source = "unknown"
+
+            result = process_memory(
+                note_for_agent,
+                media_metadata=media_metadata,
+                user_date=user_date_value,
+                user_location=memory_location.strip() if memory_location.strip() else None,
+                user_date_source=user_date_source
+            )
 
             st.success("Memory processed by the agent workflow.")
 
@@ -102,13 +251,12 @@ with tab_add:
                 )
 
             st.subheader("Memory Agent Output")
-            st.caption("The Memory Agent converts the user note into a structured memory record.")
+            st.caption("The Memory Agent converts the user note and optional media attachment into a structured memory record.")
             st.json(result["memory"])
 
             st.subheader("Evaluation Agent Output")
             st.caption("The Evaluation Agent checks trust score, sensitivity, and risk flags.")
             st.json(result["evaluation"])
-
 
 with tab_timeline:
     st.header("Approved Timeline")
@@ -139,6 +287,16 @@ with tab_timeline:
             st.write("Date or time period:", memory.get("date_or_time_period", "Unknown"))
             st.write("Event type:", memory.get("event_type", "Unknown"))
             st.write("Description:", memory.get("description", ""))
+
+            media = memory.get("media")
+            if media:
+                st.write("Attached media:", media.get("filename"))
+
+                if media.get("file_type", "").startswith("image"):
+                    st.image(media.get("file_path"), use_container_width=True)
+                elif media.get("file_type", "").startswith("video"):
+                    st.video(media.get("file_path"))
+
             st.write("Emotion:", memory.get("emotion", "Unknown"))
             st.write("Care relevance:", memory.get("care_relevance", ""))
             st.write("Confidence:", memory.get("confidence", "Unknown"))
@@ -184,6 +342,15 @@ with tab_review:
             st.markdown("### Human Review Action")
 
             current_memory = item.get("memory", {})
+
+            media = current_memory.get("media")
+            if media:
+                st.write("Attached media:", media.get("filename"))
+
+                if media.get("file_type", "").startswith("image"):
+                    st.image(media.get("file_path"), use_container_width=True)
+                elif media.get("file_type", "").startswith("video"):
+                    st.video(media.get("file_path"))
 
             edited_title = st.text_input(
                 "Edit title",

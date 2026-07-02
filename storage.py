@@ -1,25 +1,24 @@
 import json
 import os
+from PIL import Image
+from PIL.ExifTags import TAGS
 
 
 DATA_DIR = "data"
+MEDIA_DIR = os.path.join(DATA_DIR, "media")
 TIMELINE_FILE = os.path.join(DATA_DIR, "timeline.json")
 REVIEW_QUEUE_FILE = os.path.join(DATA_DIR, "review_queue.json")
 
 
 def ensure_data_files():
-    """
-    Creates the data folder and JSON files if they do not already exist.
-    """
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(MEDIA_DIR, exist_ok=True)
 
     if not os.path.exists(TIMELINE_FILE):
-        with open(TIMELINE_FILE, "w") as file:
-            json.dump([], file, indent=2)
+        save_json(TIMELINE_FILE, [])
 
     if not os.path.exists(REVIEW_QUEUE_FILE):
-        with open(REVIEW_QUEUE_FILE, "w") as file:
-            json.dump([], file, indent=2)
+        save_json(REVIEW_QUEUE_FILE, [])
 
 
 def load_json(filepath):
@@ -139,3 +138,68 @@ def load_demo_data():
     ensure_data_files()
     save_json(TIMELINE_FILE, [DEMO_SAFE_MEMORY, DEMO_SAFE_MEMORY_2])
     save_json(REVIEW_QUEUE_FILE, [DEMO_REVIEW_ITEM])
+
+def save_uploaded_media(uploaded_file):
+    """
+    Saves an uploaded photo or video into the local data/media folder.
+    Returns metadata that can be attached to a memory record.
+    """
+    ensure_data_files()
+
+    if uploaded_file is None:
+        return None
+
+    safe_filename = uploaded_file.name.replace(" ", "_")
+    file_path = os.path.join(MEDIA_DIR, safe_filename)
+
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+    return {
+        "filename": safe_filename,
+        "file_path": file_path,
+        "file_type": uploaded_file.type
+    }
+
+def extract_photo_date(uploaded_file):
+    """
+    Attempts to extract the original photo date from EXIF metadata.
+    Returns a YYYY-MM-DD string if found.
+    Does not extract GPS/location metadata.
+    """
+    if uploaded_file is None:
+        return None
+
+    if not uploaded_file.type.startswith("image"):
+        return None
+
+    try:
+        uploaded_file.seek(0)
+        image = Image.open(uploaded_file)
+        exif_data = image.getexif()
+
+        if not exif_data:
+            uploaded_file.seek(0)
+            return None
+
+        for tag_id, value in exif_data.items():
+            tag_name = TAGS.get(tag_id, tag_id)
+
+            if tag_name in ["DateTimeOriginal", "DateTimeDigitized", "DateTime"]:
+                # EXIF date format is usually: YYYY:MM:DD HH:MM:SS
+                date_string = str(value)
+
+                if len(date_string) >= 10:
+                    year = date_string[0:4]
+                    month = date_string[5:7]
+                    day = date_string[8:10]
+
+                    uploaded_file.seek(0)
+                    return f"{year}-{month}-{day}"
+
+        uploaded_file.seek(0)
+        return None
+
+    except Exception:
+        uploaded_file.seek(0)
+        return None
